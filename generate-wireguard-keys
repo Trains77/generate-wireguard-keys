@@ -8,6 +8,7 @@ echo "An error has occurred, aborting"
 exit 4
 fi
 }
+
 # Used to print help if help was requested
 function GetCommandHelp { echo "
 generate-wireguard-keys - Script to generate wireguard keys and configs for a given client in the current working folder
@@ -19,6 +20,7 @@ Syntax: generate-wireguard-keys [CLIENT_VPN_IP] [CLIENT_NAME]
 [CLIENT_NAME] - Human friendly name for the client for use in identifying it in the configs"
 exit
 }
+
 # Make sure user doesn't want help
 for i in "$1" "$2" "$3"; do if [ "$i" == "--help" ]; then
 GetCommandHelp
@@ -33,6 +35,7 @@ if test -f ./wg_generator_server_settings; then
 elif test -f "$HOME"/.config/wg_generator_server_settings; then
     source "$HOME"/.config/wg_generator_server_settings
 else
+
 echo No wg_generator_server_settings file found, generating and using template for server variables in current directory
 
 # Generate wg_generator_server_settings file
@@ -45,6 +48,7 @@ export SERVER_PUBLIC_KEY=public_key_goes_here" > ./wg_generator_server_settings
 source ./wg_generator_server_settings
 # Techincally the 2 above command don't NEED to work for the rest of the script to, so we won't error it out if it fails
 fi
+
 # We will complain about it though!
 # Check if the variables actually exist
 if [ -z ${SERVER_IP+x} ]; then
@@ -71,7 +75,7 @@ exit 3
 fi
 echo
 else
-export CLIENT_IP=$1
+export CLIENT_IP="$1"
 fi
 
 # interrogate for Device name
@@ -83,8 +87,15 @@ echo Please enter a name for the device!
 exit 3
 fi
 else
-export DEVICE_NAME=$2
+export DEVICE_NAME="$2"
 fi
+
+# This script does not take spaces into account in any way, so lets replace them with underscores before they break something (hopefully)
+export DEVICE_NAME=$(sed 's/ /_/g' <<< "$DEVICE_NAME")
+export CLIENT_IP=$(sed 's/ /_/g' <<< "$CLIENT_IP")
+export SERVER_IP=$(sed 's/ /_/g' <<< "$SERVER_IP")
+export SERVER_PUBLIC_KEY=$(sed 's/ /_/g' <<< "$SERVER_PUBLIC_KEY")
+export SERVER_PORT=$(sed 's/ /_/g' <<< "$SERVER_PORT")
 
 # Done interrogating, lets start gey generating
 echo Alright, generating keys...
