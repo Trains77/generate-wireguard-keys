@@ -1,0 +1,6 @@
+# Server config variables for the generate-wireguard-keys command
+# This file can abe either in ~/.config/wg_generator_server_settings or in the current working directory, with the current working directory file taking priority
+# We just need these 3 variables to be exported, how they are doesn't matter
+export SERVER_IP=0.0.0.0
+export SERVER_PORT=51820
+export SERVER_PUBLIC_KEY=public_key_goes_here

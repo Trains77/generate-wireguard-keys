@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# Help function code
+
+# Make sure the previous command actually worked, and error out if it didn't
+function DidCommandWork { if ! [ "$?" == "0" ]; then
+echo "An error has occurred, aborting"
+exit 4
+fi
+}
+# Used to print help if help was requested
+function GetCommandHelp { echo "
+generate-wireguard-keys - Script to generate wireguard keys and configs for a given client in the current working folder
+
+Syntax: generate-wireguard-keys [CLIENT_VPN_IP] [CLIENT_NAME] 
+
+[CLIENT_VPN_IP] - The ip the client will have when connected to the Wireguard vpn
+
+[CLIENT_NAME] - Human friendly name for the client for use in identifying it in the configs"
+exit
+}
+# Make sure user doesn't want help
+for i in "$1" "$2" "$3"; do if [ "$i" == "--help" ]; then
+GetCommandHelp
+elif [ "$i" == "-h" ]; then
+GetCommandHelp
+fi
+done
+
+# Set some variables for the server vpn, change them to your server vpn's settings
+if test -f ./wg_generator_server_settings; then
+    source ./wg_generator_server_settings
+elif test -f "$HOME"/.config/wg_generator_server_settings; then
+    source "$HOME"/.config/wg_generator_server_settings
+else
+echo No wg_generator_server_settings file found, generating and using template for server variables in current directory
+
+# Generate wg_generator_server_settings file
+echo "# Server config variables for the generate-wireguard-keys command
+# This file can abe either in ~/.config/wg_generator_server_settings or in the current working directory, with the current working directory file taking priority
+# We just need these 3 variables to be exported, how they are doesn't matter
+export SERVER_IP=0.0.0.0
+export SERVER_PORT=51820
+export SERVER_PUBLIC_KEY=public_key_goes_here" > ./wg_generator_server_settings
+source ./wg_generator_server_settings
+# Techincally the 2 above command don't NEED to work for the rest of the script to, so we won't error it out if it fails
+fi
+# We will complain about it though!
+# Check if the variables actually exist
+if [ -z ${SERVER_IP+x} ]; then
+echo wg_generator_server_settings is missing SERVER_IP variable!
+fi
+if [ -z ${SERVER_PORT+x} ]; then
+echo wg_generator_server_settings is missing SERVER_PORT variable!
+fi
+if [ -z ${SERVER_PUBLIC_KEY+x} ]; then
+echo wg_generator_server_settings is missing SERVER_PUBLIC_KEY variable!
+fi
+
+# interrogate the user for client config parameters
+echo First we need some information about the client in question.
+
+# Interagte for client vpn ip
+if [ -z ${1+x} ]; then
+echo What should the device internal VPN ip be?
+read CLIENT_IP
+# Validate that something was inputted
+if [ "$CLIENT_IP" == "" ]; then
+echo Please enter a ip for the client!
+exit 3
+fi
+echo
+else
+export CLIENT_IP=$1
+fi
+
+# interrogate for Device name
+if [ -z ${2+x} ]; then
+echo What is the device name?
+read DEVICE_NAME
+if [ "$DEVICE_NAME" == "" ]; then
+echo Please enter a name for the device!
+exit 3
+fi
+else
+export DEVICE_NAME=$2
+fi
+
+# Done interrogating, lets start gey generating
+echo Alright, generating keys...
+# Set umask so only user can see keys
+umask 0077
+DidCommandWork
+
+wg genkey > "$DEVICE_NAME".key # Private Key
+DidCommandWork
+
+wg pubkey < "$DEVICE_NAME".key > "$DEVICE_NAME".pub # Public Key
+DidCommandWork
+
+# Shared key not technically needed, but Post-Quantum encryption is cool and it isn't that hard to add with wg-quick
+wg genpsk > "$DEVICE_NAME".psk # Preshared Key
+DidCommandWork
+
+echo Generating configs...
+# Create wg-quick configuration files
+
+# This only creates a server config snippet, you need a valid server config to put this in
+
+echo "[Peer]
+# $(echo $DEVICE_NAME)
+PublicKey = $(cat $DEVICE_NAME.pub)
+PresharedKey = $(cat $DEVICE_NAME.psk)
+AllowedIPs = $CLIENT_IP/32
+PersistentKeepalive = 60" > $DEVICE_NAME.server_config.txt
+DidCommandWork
+echo Client config variables
+
+# This should be a completly valid wg-quick config file, and can simply be moved to /etc/wireguard for use
+echo "[Interface]
+# Uncomment below line if you need port your device to accept Incoming non-LAN traffic
+# PostUp = ip rule add from NON_VPN_LAN_IP lookup main
+Address = $CLIENT_IP/32
+PrivateKey = $(cat $DEVICE_NAME.key)
+
+[Peer]
+AllowedIPs = 0.0.0.0/0,::0/0
+Endpoint = $SERVER_IP:$SERVER_PORT
+PublicKey = $SERVER_PUBLIC_KEY
+PresharedKey = $(cat $DEVICE_NAME.psk)
+PersistentKeepalive = 60" > $DEVICE_NAME.client_config.txt
+
+DidCommandWork
