@@ -29,6 +29,9 @@ GetCommandHelp
 fi
 done
 
+# Check if wg utility exists
+command -v wg >/dev/null 2>&1 || { echo >&2 "The wg command doesn't seem to be installed, or isn't in the PATH, Cannot create certificates"; exit 9; }
+
 # Set some variables for the server vpn, change them to your server vpn's settings
 if test -f ./wg_generator_server_settings; then
     source ./wg_generator_server_settings
