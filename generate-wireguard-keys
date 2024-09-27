@@ -29,7 +29,7 @@ GetCommandHelp
 fi
 done
 
-# Check if wg utility exists
+# Check if wg utility exists, since it is somewhat important for this script
 command -v wg >/dev/null 2>&1 || { echo >&2 "The wg command doesn't seem to be installed, or isn't in the PATH, Cannot create certificates"; exit 9; }
 
 # Set some variables for the server vpn, change them to your server vpn's settings
@@ -39,15 +39,16 @@ elif test -f "$HOME"/.config/wg_generator_server_settings; then
     source "$HOME"/.config/wg_generator_server_settings
 else
 
-echo No wg_generator_server_settings file found, generating and using template for server variables in current directory
+echo No wg_generator_server_settings file found, generating and using template for server variables in the current directory
 
 # Generate wg_generator_server_settings file
 echo "# Server config variables for the generate-wireguard-keys command
 # This file can abe either in ~/.config/wg_generator_server_settings or in the current working directory, with the current working directory file taking priority
 # We just need these 3 variables to be exported, how they are doesn't matter
-export SERVER_IP=0.0.0.0
-export SERVER_PORT=51820
-export SERVER_PUBLIC_KEY=public_key_goes_here" > ./wg_generator_server_settings
+
+SERVER_IP=0.0.0.0
+SERVER_PORT=51820
+SERVER_PUBLIC_KEY=public_key_goes_here" > ./wg_generator_server_settings
 source ./wg_generator_server_settings
 # Techincally the 2 above command don't NEED to work for the rest of the script to, so we won't error it out if it fails
 fi
@@ -70,7 +71,7 @@ echo First we need some information about the client in question.
 # Interagte for client vpn ip
 if [ -z ${1+x} ]; then
 echo What should the device internal VPN ip be?
-read CLIENT_IP
+read -r CLIENT_IP
 # Validate that something was inputted
 if [ "$CLIENT_IP" == "" ]; then
 echo Please enter a ip for the client!
@@ -78,27 +79,27 @@ exit 3
 fi
 echo
 else
-export CLIENT_IP="$1"
+CLIENT_IP="$1"
 fi
 
 # interrogate for Device name
 if [ -z ${2+x} ]; then
 echo What is the device name?
-read DEVICE_NAME
+read -r DEVICE_NAME
 if [ "$DEVICE_NAME" == "" ]; then
 echo Please enter a name for the device!
 exit 3
 fi
 else
-export DEVICE_NAME="$2"
+DEVICE_NAME="$2"
 fi
 
 # This script does not take spaces into account in any way, so lets replace them with underscores before they break something (hopefully)
-export DEVICE_NAME=$(sed 's/ /_/g' <<< "$DEVICE_NAME")
-export CLIENT_IP=$(sed 's/ /_/g' <<< "$CLIENT_IP")
-export SERVER_IP=$(sed 's/ /_/g' <<< "$SERVER_IP")
-export SERVER_PUBLIC_KEY=$(sed 's/ /_/g' <<< "$SERVER_PUBLIC_KEY")
-export SERVER_PORT=$(sed 's/ /_/g' <<< "$SERVER_PORT")
+DEVICE_NAME=${DEVICE_NAME//" "/_}
+CLIENT_IP=${CLIENT_IP//" "/_}
+SERVER_IP=${SERVER_IP//" "/_}
+SERVER_PUBLIC_KEY=${SERVER_PUBLIC_KEY//" "/_}
+SERVER_PORT=${SERVER_PORT//" "/_}
 
 # Done interrogating, lets start gey generating
 echo Alright, generating keys...
@@ -116,17 +117,22 @@ DidCommandWork
 wg genpsk > "$DEVICE_NAME".psk # Preshared Key
 DidCommandWork
 
+# Only read back from files once instead of twice
+WG_PRIVATE_KEY=$(cat "$DEVICE_NAME".key)
+WG_SHARED_KEY=$(cat "$DEVICE_NAME".psk)
+WG_PUBLIC_KEY=$(cat "$DEVICE_NAME".pub)
+
 echo Generating configs...
 # Create wg-quick configuration files
 
 # This only creates a server config snippet, you need a valid server config to put this in
 
 echo "[Peer]
-# $(echo $DEVICE_NAME)
-PublicKey = $(cat $DEVICE_NAME.pub)
-PresharedKey = $(cat $DEVICE_NAME.psk)
+# $DEVICE_NAME
+PublicKey = $WG_PUBLIC_KEY
+PresharedKey = $WG_SHARED_KEY
 AllowedIPs = $CLIENT_IP/32
-PersistentKeepalive = 60" > $DEVICE_NAME.server_config.txt
+PersistentKeepalive = 60" > "$DEVICE_NAME".server_config.txt
 DidCommandWork
 echo Client config variables
 
@@ -135,13 +141,13 @@ echo "[Interface]
 # Uncomment below line if you need port your device to accept Incoming non-LAN traffic
 # PostUp = ip rule add from NON_VPN_LAN_IP lookup main
 Address = $CLIENT_IP/32
-PrivateKey = $(cat $DEVICE_NAME.key)
+PrivateKey = $WG_PRIVATE_KEY
 
 [Peer]
 AllowedIPs = 0.0.0.0/0,::0/0
 Endpoint = $SERVER_IP:$SERVER_PORT
 PublicKey = $SERVER_PUBLIC_KEY
-PresharedKey = $(cat $DEVICE_NAME.psk)
-PersistentKeepalive = 60" > $DEVICE_NAME.client_config.txt
+PresharedKey = $WG_SHARED_KEY
+PersistentKeepalive = 60" > "$DEVICE_NAME".client_config.txt
 
 DidCommandWork
