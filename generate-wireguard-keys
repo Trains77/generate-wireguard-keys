@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Help function code
-
 # Make sure the previous command actually worked, and error out if it didn't
 function DidCommandWork { if ! [ "$?" == "0" ]; then
 echo "An error has occurred, aborting"
@@ -72,6 +70,7 @@ echo First we need some information about the client in question.
 if [ -z ${1+x} ]; then
 echo What should the device internal VPN ip be?
 read -r CLIENT_IP
+
 # Validate that something was inputted
 if [ "$CLIENT_IP" == "" ]; then
 echo Please enter a ip for the client!
@@ -86,6 +85,8 @@ fi
 if [ -z ${2+x} ]; then
 echo What is the device name?
 read -r DEVICE_NAME
+
+# Again, validate that something was inputted
 if [ "$DEVICE_NAME" == "" ]; then
 echo Please enter a name for the device!
 exit 3
@@ -103,6 +104,7 @@ SERVER_PORT=${SERVER_PORT//" "/_}
 
 # Done interrogating, lets start gey generating
 echo Alright, generating keys...
+
 # Set umask so only user can see keys
 umask 0077
 DidCommandWork
