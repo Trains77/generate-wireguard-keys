@@ -140,7 +140,7 @@ echo Client config variables
 
 # This should be a completly valid wg-quick config file, and can simply be moved to /etc/wireguard for use
 echo "[Interface]
-# Uncomment below line if you need port your device to accept Incoming non-LAN traffic
+# Uncomment below line if you need to configure your Linux system to accept incoming non-LAN traffic, as by default this doesn't work
 # PostUp = ip rule add from NON_VPN_LAN_IP lookup main
 Address = $CLIENT_IP/32
 PrivateKey = $WG_PRIVATE_KEY
